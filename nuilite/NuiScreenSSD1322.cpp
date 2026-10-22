@@ -164,7 +164,6 @@ bool NuiScreenSSD1322::init(int dcPin, int resetPin) {
 
 void NuiScreenSSD1322::deinit() {
     if (spidevFd_ > 0) {
-        writeCommand(0xAE, 0); // Display OFF
         close(spidevFd_);
         spidevFd_ = -1;
     }
