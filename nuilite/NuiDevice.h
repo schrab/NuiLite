@@ -35,6 +35,9 @@ public:
 
     void displayClear();
     void displayPaint();
+    void initDisplay();
+    void deinitDisplay();
+    bool isDisplayInitialized() const;
 
     // new api
     void gClear(unsigned clr);

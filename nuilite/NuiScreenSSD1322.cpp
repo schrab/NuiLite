@@ -124,8 +124,16 @@ bool NuiScreenSSD1322::init(int dcPin, int resetPin) {
     gpioDc_ = gpiod_chip_get_line(gpioChip_, dcPin);
     gpioReset_ = gpiod_chip_get_line(gpioChip_, resetPin);
 
-    if (gpioDc_) gpiod_line_request_output(gpioDc_, "SSD1322_DC", 0);
-    if (gpioReset_) gpiod_line_request_output(gpioReset_, "SSD1322_RST", 0);
+    if (gpioDc_) {
+        if (gpiod_line_request_output(gpioDc_, "SSD1322_DC", 0) < 0) {
+            fprintf(stderr, "WARN (screen): failed to request DC line (errno=%d: %s)\n", errno, strerror(errno));
+        }
+    }
+    if (gpioReset_) {
+        if (gpiod_line_request_output(gpioReset_, "SSD1322_RST", 1) < 0) {
+            fprintf(stderr, "WARN (screen): failed to request RST line (errno=%d: %s)\n", errno, strerror(errno));
+        }
+    }
 
     // Pull reset HIGH for normal operation
     if (gpioReset_) {
@@ -157,26 +165,28 @@ bool NuiScreenSSD1322::init(int dcPin, int resetPin) {
 void NuiScreenSSD1322::deinit() {
     if (spidevFd_ > 0) {
         writeCommand(0xAE, 0); // Display OFF
-        if (gpioReset_) {
-            gpiod_line_set_value(gpioReset_, 0);
-            gpiod_line_release(gpioReset_);
-            gpioReset_ = nullptr;
-        }
-        if (gpioDc_) {
-            gpiod_line_release(gpioDc_);
-            gpioDc_ = nullptr;
-        }
-        if (gpioChip_) {
-            gpiod_chip_close(gpioChip_);
-            gpioChip_ = nullptr;
-        }
         close(spidevFd_);
         spidevFd_ = -1;
+    }
+    if (gpioReset_) {
+        gpiod_line_set_value(gpioReset_, 1); // Keep reset HIGH (inactive) for other processes
+        gpiod_line_release(gpioReset_);
+        gpioReset_ = nullptr;
+    }
+    if (gpioDc_) {
+        gpiod_line_set_value(gpioDc_, 0);
+        gpiod_line_release(gpioDc_);
+        gpioDc_ = nullptr;
+    }
+    if (gpioChip_) {
+        gpiod_chip_close(gpioChip_);
+        gpioChip_ = nullptr;
     }
     if (spidevBuffer_) {
         free(spidevBuffer_);
         spidevBuffer_ = nullptr;
     }
+    shouldTurnOn_ = true;
 }
 
 void NuiScreenSSD1322::update(cairo_surface_t *surface) {

@@ -118,14 +118,16 @@ public:
     // text functions 
     void clearText(unsigned clr, unsigned line);
 
+    void initDisplay();
+    void deinitDisplay();
+    bool isDisplayInitialized() const;
+
     // public but not part of interface!
     void processGPIO();
 
 private:
     void initGPIO();
     void deinitGPIO();
-    void initDisplay();
-    void deinitDisplay();
     void loadPrefsFromSidekickJson();
 
     std::string resPath_;
@@ -198,6 +200,18 @@ void NuiDevice::displayClear() {
 
 void NuiDevice::displayPaint() {
     impl_->displayPaint();
+}
+
+void NuiDevice::initDisplay() {
+    impl_->initDisplay();
+}
+
+void NuiDevice::deinitDisplay() {
+    impl_->deinitDisplay();
+}
+
+bool NuiDevice::isDisplayInitialized() const {
+    return impl_->isDisplayInitialized();
 }
 
 
@@ -458,6 +472,7 @@ void NuiDeviceImpl_::displayPaint() {
 }
 
 void NuiDeviceImpl_::displayClear() {
+    if (!cr_) return;
     cairo_set_operator(cr_, CAIRO_OPERATOR_CLEAR);
     cairo_paint(cr_);
     cairo_set_operator(cr_, CAIRO_OPERATOR_OVER);
@@ -465,11 +480,13 @@ void NuiDeviceImpl_::displayClear() {
 }
 
 void NuiDeviceImpl_::gClear(unsigned clr) {
+    if (!cr_) return;
     gFillArea(clr, 0, 0, SCREEN_X, SCREEN_Y);
     dirty_ = true;
 }
 
 void NuiDeviceImpl_::gSetPixel(unsigned clr, unsigned x, unsigned y) {
+    if (!cr_) return;
     cairo_set_source_rgb(cr_, colours[clr], colours[clr], colours[clr]);
     cairo_rectangle(cr_, x, y, 1, 1);
     cairo_fill(cr_);
@@ -478,6 +495,7 @@ void NuiDeviceImpl_::gSetPixel(unsigned clr, unsigned x, unsigned y) {
 
 
 void NuiDeviceImpl_::gFillArea(unsigned clr, unsigned x, unsigned y, unsigned w, unsigned h) {
+    if (!cr_) return;
     cairo_set_source_rgb(cr_, colours[clr], colours[clr], colours[clr]);
     cairo_rectangle(cr_, x, y, w, h);
     cairo_fill(cr_);
@@ -486,6 +504,7 @@ void NuiDeviceImpl_::gFillArea(unsigned clr, unsigned x, unsigned y, unsigned w,
 
 
 void NuiDeviceImpl_::gCircle(unsigned clr, unsigned x, unsigned y, unsigned r) {
+    if (!cr_) return;
     cairo_set_source_rgb(cr_, colours[clr], colours[clr], colours[clr]);
     cairo_arc(cr_, x, y, r, 0, 2 * M_PI);
     cairo_stroke(cr_);
@@ -494,6 +513,7 @@ void NuiDeviceImpl_::gCircle(unsigned clr, unsigned x, unsigned y, unsigned r) {
 
 
 void NuiDeviceImpl_::gFilledCircle(unsigned clr, unsigned x, unsigned y, unsigned r) {
+    if (!cr_) return;
     cairo_set_source_rgb(cr_, colours[clr], colours[clr], colours[clr]);
     cairo_arc(cr_, x, y, r, 0, 2 * M_PI);
     cairo_fill(cr_);
@@ -502,6 +522,7 @@ void NuiDeviceImpl_::gFilledCircle(unsigned clr, unsigned x, unsigned y, unsigne
 
 
 void NuiDeviceImpl_::gLine(unsigned clr, unsigned x1, unsigned y1, unsigned x2, unsigned y2) {
+    if (!cr_) return;
     cairo_set_source_rgb(cr_, colours[clr], colours[clr], colours[clr]);
     cairo_move_to(cr_, x1, y1);
     cairo_line_to(cr_, x2, y2);
@@ -511,6 +532,7 @@ void NuiDeviceImpl_::gLine(unsigned clr, unsigned x1, unsigned y1, unsigned x2, 
 
 
 void NuiDeviceImpl_::gRectangle(unsigned clr, unsigned x, unsigned y, unsigned w, unsigned h) {
+    if (!cr_) return;
     cairo_rectangle(cr_, x, y, w, h);
     cairo_stroke(cr_);
     dirty_ = true;
@@ -523,6 +545,7 @@ void NuiDeviceImpl_::gInvert() {
 
 
 void NuiDeviceImpl_::gWaveform(unsigned clr, const std::vector<unsigned> &wave) {
+    if (!cr_) return;
     cairo_set_source_rgb(cr_, colours[clr], colours[clr], colours[clr]);
     int x = 0;
     for (auto y : wave) {
@@ -539,6 +562,7 @@ void NuiDeviceImpl_::gWaveform(unsigned clr, const std::vector<unsigned> &wave) 
 }
 
 void NuiDeviceImpl_::gText(unsigned clr, unsigned x, unsigned y, const std::string &str) {
+    if (!cr_) return;
     cairo_set_source_rgb(cr_, colours[clr], colours[clr], colours[clr]);
     cairo_move_to(cr_, x, y);
     cairo_show_text(cr_, str.c_str());
@@ -548,6 +572,7 @@ void NuiDeviceImpl_::gText(unsigned clr, unsigned x, unsigned y, const std::stri
 
 
 void NuiDeviceImpl_::gInvertArea(unsigned x, unsigned y, unsigned w, unsigned h) {
+    if (!cr_) return;
     cairo_set_source_rgb(cr_, 1., 1., 1.);
     cairo_set_operator(cr_, CAIRO_OPERATOR_DIFFERENCE);
     cairo_rectangle(cr_, x, y, w, h);
@@ -557,6 +582,7 @@ void NuiDeviceImpl_::gInvertArea(unsigned x, unsigned y, unsigned w, unsigned h)
 }
 
 void NuiDeviceImpl_::gPng(unsigned x, unsigned y, const char *filename) {
+    if (!cr_ || !surface_) return;
     int img_w, img_h;
 
     auto image = cairo_image_surface_create_from_png(filename);
@@ -590,6 +616,7 @@ void NuiDeviceImpl_::invertLine(unsigned line) {
 }
 
 void NuiDeviceImpl_::clearLine(unsigned clr, unsigned line) {
+    if (!cr_) return;
     unsigned x = 0;
     unsigned y = (line * SCREEN_LINE_SIZE + SCREEN_LINE_SIZE) + SCREEN_CHAR_DROP; // letters with drop
     cairo_set_source_rgb(cr_, colours[clr], colours[clr], colours[clr]);
@@ -719,38 +746,50 @@ void NuiDeviceImpl_::deinitGPIO() {
 
 
 void NuiDeviceImpl_::initDisplay() {
-    surface_ = cairo_image_surface_create(SCREEN_FMT, SCREEN_X, SCREEN_Y);
-    cr_ = cairo_create(surface_);
+    if (screenDriver_ && surface_) {
+        return; // already initialized
+    }
+
+    if (!surface_) {
+        surface_ = cairo_image_surface_create(SCREEN_FMT, SCREEN_X, SCREEN_Y);
+    }
+    if (!cr_) {
+        cr_ = cairo_create(surface_);
+    }
 
     setup_local_fonts(resPath_.c_str());
 
-    ScreenDriverType dtype = screenDriverTypeFromString(driverName_);
-    screenDriver_ = createScreenDriver(dtype);
-    if (screenDriver_) {
-        if (!screenDriver_->init(dcPin_, resetPin_)) {
-            fprintf(stderr, "WARN (screen): failed to initialize %s driver\n", screenDriver_->name());
+    if (!screenDriver_) {
+        ScreenDriverType dtype = screenDriverTypeFromString(driverName_);
+        screenDriver_ = createScreenDriver(dtype);
+        if (screenDriver_) {
+            if (!screenDriver_->init(dcPin_, resetPin_)) {
+                fprintf(stderr, "WARN (screen): failed to initialize %s driver\n", screenDriver_->name());
+            } else {
+                fprintf(stderr, "NuiDevice: using screen driver %s\n", screenDriver_->name());
+            }
         } else {
-            fprintf(stderr, "NuiDevice: using screen driver %s\n", screenDriver_->name());
+            fprintf(stderr, "WARN (screen): no screen driver created for %s\n", driverName_.c_str());
         }
-    } else {
-        fprintf(stderr, "WARN (screen): no screen driver created for %s\n", driverName_.c_str());
     }
 
-    // clear display surface
-    cairo_set_operator(cr_, CAIRO_OPERATOR_CLEAR);
-    cairo_paint(cr_);
-    cairo_set_operator(cr_, CAIRO_OPERATOR_OVER);
+    if (cr_) {
+        // clear display surface
+        cairo_set_operator(cr_, CAIRO_OPERATOR_CLEAR);
+        cairo_paint(cr_);
+        cairo_set_operator(cr_, CAIRO_OPERATOR_OVER);
 
-    cairo_font_options_t *font_options = cairo_font_options_create();
-    cairo_font_options_set_antialias(font_options, CAIRO_ANTIALIAS_SUBPIXEL);
-    cairo_set_font_options(cr_, font_options);
-    cairo_font_options_destroy(font_options);
+        cairo_font_options_t *font_options = cairo_font_options_create();
+        cairo_font_options_set_antialias(font_options, CAIRO_ANTIALIAS_SUBPIXEL);
+        cairo_set_font_options(cr_, font_options);
+        cairo_font_options_destroy(font_options);
 
-    if (ct[0]) {
-        cairo_set_font_face(cr_, ct[0]);
+        if (ct[0]) {
+            cairo_set_font_face(cr_, ct[0]);
+        }
+        cairo_set_font_size(cr_, 8.0);
+        cairo_set_source_rgb(cr_, 1, 1, 1);
     }
-    cairo_set_font_size(cr_, 8.0);
-    cairo_set_source_rgb(cr_, 1, 1, 1);
 
     dirty_ = true;
 }
@@ -768,6 +807,11 @@ void NuiDeviceImpl_::deinitDisplay() {
         cairo_surface_destroy(surface_);
         surface_ = nullptr;
     }
+    dirty_ = false;
+}
+
+bool NuiDeviceImpl_::isDisplayInitialized() const {
+    return screenDriver_ != nullptr && surface_ != nullptr;
 }
 
 
@@ -810,6 +854,10 @@ static char font_path[NUM_FONTS][32];
 
 
 void setup_local_fonts(const char *resPath) {
+    static bool fonts_loaded = false;
+    if (fonts_loaded) return;
+    fonts_loaded = true;
+
     static FT_Library value;
     static FT_Error status;
     static FT_Face face[NUM_FONTS];
