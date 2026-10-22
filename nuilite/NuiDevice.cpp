@@ -327,15 +327,15 @@ void NuiDeviceImpl_::loadPrefsFromSidekickJson() {
         if (!json) continue;
 
         cJSON *driverItem = cJSON_GetObjectItem(json, "screenDriver");
-        if (driverItem && cJSON_IsString(driverItem) && driverItem->valuestring) {
+        if (driverItem && driverItem->type == cJSON_String && driverItem->valuestring) {
             driverName_ = driverItem->valuestring;
         }
         cJSON *dcItem = cJSON_GetObjectItem(json, "screenDcPin");
-        if (dcItem && cJSON_IsNumber(dcItem) && dcPin_ < 0) {
+        if (dcItem && dcItem->type == cJSON_Number && dcPin_ < 0) {
             dcPin_ = dcItem->valueint;
         }
         cJSON *rstItem = cJSON_GetObjectItem(json, "screenResetPin");
-        if (rstItem && cJSON_IsNumber(rstItem) && resetPin_ < 0) {
+        if (rstItem && rstItem->type == cJSON_Number && resetPin_ < 0) {
             resetPin_ = rstItem->valueint;
         }
 
