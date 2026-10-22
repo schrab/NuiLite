@@ -143,7 +143,13 @@ void SKApp::run() {
         OscMsg msg;
 
         while (listenPort_ > 0 && readMessageQueue_.try_dequeue(msg)) {
-            oscProcessor_->ProcessPacket(msg.buffer_, msg.size_, msg.origin_);
+            try {
+                oscProcessor_->ProcessPacket(msg.buffer_, msg.size_, msg.origin_);
+            } catch (const std::exception &e) {
+                std::cerr << "SKApp: OSC parse error: " << e.what() << std::endl;
+            } catch (...) {
+                std::cerr << "SKApp: unknown OSC parse error" << std::endl;
+            }
         }
 
         if (activeCount_ > 0) {
