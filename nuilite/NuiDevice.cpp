@@ -1,4 +1,6 @@
 #include "NuiDevice.h"
+#include "NuiScreen.h"
+#include <cJSON.h>
 
 #include <memory>
 #include <vector>
@@ -79,7 +81,7 @@ struct NuiEventMsg {
 // implementation class
 class NuiDeviceImpl_ {
 public:
-    NuiDeviceImpl_(const char *resPath);
+    NuiDeviceImpl_(const char *resPath, const char *driver = nullptr, int dcPin = -1, int resetPin = -1);
     ~NuiDeviceImpl_();
 
     void start();
@@ -123,7 +125,7 @@ private:
     void deinitGPIO();
     void initDisplay();
     void deinitDisplay();
-
+    void loadPrefsFromSidekickJson();
 
     std::string resPath_;
     std::thread gpioThread_;
@@ -134,10 +136,12 @@ private:
     int keyFd_;
     int encFd_[MAX_ENCODERS];
     unsigned numEncoders_ = 4;
-    std::string fbDev_;
 
-    cairo_surface_t *surfacefb_;
-    cairo_t *crfb_;
+    std::unique_ptr<NuiScreen> screenDriver_;
+    std::string driverName_;
+    int dcPin_ = -1;
+    int resetPin_ = -1;
+
     cairo_surface_t *surface_;
     cairo_t *cr_;
     std::vector<std::shared_ptr<NuiCallback>> callbacks_;
@@ -146,8 +150,8 @@ private:
 };
 
 //NuiDevice proxy
-NuiDevice::NuiDevice(const char *resPath) {
-    impl_ = new NuiDeviceImpl_(resPath);
+NuiDevice::NuiDevice(const char *resPath, const char *driver, int dcPin, int resetPin) {
+    impl_ = new NuiDeviceImpl_(resPath, driver, dcPin, resetPin);
 }
 
 NuiDevice::~NuiDevice() {
@@ -287,17 +291,94 @@ void NuiDevice::clearText(unsigned clr, unsigned line) {
 
 
 // fwd decl for helper functions
-extern void cairo_linuxfb_surface_destroy(void *device);
-extern cairo_surface_t *cairo_linuxfb_surface_create(const char *fbdev);
 extern int opengpio(const char *pathname, int flags);
 void setup_local_fonts(const char *);
 
+void NuiDeviceImpl_::loadPrefsFromSidekickJson() {
+    const std::vector<std::string> searchPaths = {
+        "./sidekick.json",
+        std::string(getenv("HOME") ? getenv("HOME") : "") + "/sidekick/sidekick.json",
+        "/home/we/sidekick/sidekick.json",
+        "/usr/local/sidekick/sidekick.json"
+    };
+
+    for (const auto &path : searchPaths) {
+        if (path.empty()) continue;
+        FILE *f = fopen(path.c_str(), "rb");
+        if (!f) continue;
+        fseek(f, 0, SEEK_END);
+        long len = ftell(f);
+        fseek(f, 0, SEEK_SET);
+        if (len <= 0) {
+            fclose(f);
+            continue;
+        }
+        char *data = static_cast<char *>(malloc(len + 1));
+        if (!data) {
+            fclose(f);
+            continue;
+        }
+        size_t readLen = fread(data, 1, len, f);
+        data[readLen] = '\0';
+        fclose(f);
+
+        cJSON *json = cJSON_Parse(data);
+        free(data);
+        if (!json) continue;
+
+        cJSON *driverItem = cJSON_GetObjectItem(json, "screenDriver");
+        if (driverItem && cJSON_IsString(driverItem) && driverItem->valuestring) {
+            driverName_ = driverItem->valuestring;
+        }
+        cJSON *dcItem = cJSON_GetObjectItem(json, "screenDcPin");
+        if (dcItem && cJSON_IsNumber(dcItem) && dcPin_ < 0) {
+            dcPin_ = dcItem->valueint;
+        }
+        cJSON *rstItem = cJSON_GetObjectItem(json, "screenResetPin");
+        if (rstItem && cJSON_IsNumber(rstItem) && resetPin_ < 0) {
+            resetPin_ = rstItem->valueint;
+        }
+
+        cJSON_Delete(json);
+        if (!driverName_.empty()) {
+            fprintf(stderr, "NuiDevice: loaded display config from %s (driver=%s, dc=%d, rst=%d)\n",
+                    path.c_str(), driverName_.c_str(), dcPin_, resetPin_);
+            break;
+        }
+    }
+}
 
 //// start of IMPLEMENTATION
 
+NuiDeviceImpl_::NuiDeviceImpl_(const char *resPath, const char *driver, int dcPin, int resetPin)
+    : resPath_(resPath == nullptr ? "" : resPath),
+      dcPin_(dcPin),
+      resetPin_(resetPin),
+      eventQueue_(MAX_EVENTS) {
+    if (driver && strlen(driver) > 0) {
+        driverName_ = driver;
+    }
 
-NuiDeviceImpl_::NuiDeviceImpl_(const char *resPath) : eventQueue_(MAX_EVENTS), resPath_(resPath == nullptr ? "" : resPath) {
-    if (resPath_.size() == 0) resPath_ = "/home/we/norns/resources";
+    if (driverName_.empty()) {
+        loadPrefsFromSidekickJson();
+    }
+
+    if (driverName_.empty()) {
+#ifdef DEFAULT_SCREEN_DRIVER
+        driverName_ = DEFAULT_SCREEN_DRIVER;
+#else
+        driverName_ = "ssd1325";
+#endif
+    }
+
+    if (resPath_.empty()) {
+        const char *home = getenv("HOME");
+        if (home) {
+            resPath_ = std::string(home) + "/norns/resources";
+        } else {
+            resPath_ = "/home/we/norns/resources";
+        }
+    }
 }
 
 NuiDeviceImpl_::~NuiDeviceImpl_() {
@@ -360,7 +441,10 @@ unsigned NuiDeviceImpl_::numEncoders() {
 //// display functions
 
 void NuiDeviceImpl_::displayPaint() {
-    cairo_paint(crfb_);
+    if (screenDriver_ && surface_) {
+        cairo_surface_flush(surface_);
+        screenDriver_->update(surface_);
+    }
     dirty_ = false;
 }
 
@@ -626,48 +710,55 @@ void NuiDeviceImpl_::deinitGPIO() {
 
 
 void NuiDeviceImpl_::initDisplay() {
-    fbDev_ = "/dev/fb0";
-    struct stat fs;
-    if ((stat("/dev/fb1", &fs) == 0)) {
-        fbDev_ = "/dev/fb1";
-    }
-
-    surfacefb_ = cairo_linuxfb_surface_create(fbDev_.c_str());
-    crfb_ = cairo_create(surfacefb_);
-
     surface_ = cairo_image_surface_create(SCREEN_FMT, SCREEN_X, SCREEN_Y);
     cr_ = cairo_create(surface_);
 
-    cairo_set_operator(crfb_, CAIRO_OPERATOR_SOURCE);
-    cairo_set_source_surface(crfb_, surface_, 0, 0);
-
     setup_local_fonts(resPath_.c_str());
-    // clear display
+
+    ScreenDriverType dtype = screenDriverTypeFromString(driverName_);
+    screenDriver_ = createScreenDriver(dtype);
+    if (screenDriver_) {
+        if (!screenDriver_->init(dcPin_, resetPin_)) {
+            fprintf(stderr, "WARN (screen): failed to initialize %s driver\n", screenDriver_->name());
+        } else {
+            fprintf(stderr, "NuiDevice: using screen driver %s\n", screenDriver_->name());
+        }
+    } else {
+        fprintf(stderr, "WARN (screen): no screen driver created for %s\n", driverName_.c_str());
+    }
+
+    // clear display surface
     cairo_set_operator(cr_, CAIRO_OPERATOR_CLEAR);
     cairo_paint(cr_);
     cairo_set_operator(cr_, CAIRO_OPERATOR_OVER);
-    cairo_paint(crfb_);
 
     cairo_font_options_t *font_options = cairo_font_options_create();
     cairo_font_options_set_antialias(font_options, CAIRO_ANTIALIAS_SUBPIXEL);
     cairo_set_font_options(cr_, font_options);
     cairo_font_options_destroy(font_options);
 
-    cairo_set_font_face(cr_, ct[0]);
-
-    //cairo_select_font_face(cr_, "serif", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+    if (ct[0]) {
+        cairo_set_font_face(cr_, ct[0]);
+    }
     cairo_set_font_size(cr_, 8.0);
-
-    cairo_set_source_rgb(cr_, 1, 1, 1); //!!
+    cairo_set_source_rgb(cr_, 1, 1, 1);
 
     dirty_ = true;
 }
 
 void NuiDeviceImpl_::deinitDisplay() {
-    cairo_destroy(cr_);
-    cairo_surface_destroy(surface_);
-    cairo_destroy(crfb_);
-    cairo_linuxfb_surface_destroy(surfacefb_);
+    if (screenDriver_) {
+        screenDriver_->deinit();
+        screenDriver_.reset();
+    }
+    if (cr_) {
+        cairo_destroy(cr_);
+        cr_ = nullptr;
+    }
+    if (surface_) {
+        cairo_surface_destroy(surface_);
+        surface_ = nullptr;
+    }
 }
 
 
@@ -694,98 +785,6 @@ int opengpio(const char *pathname, int flags) {
         fprintf(stderr, "WARN opengpio GPIO '%s' required %d open attempts & %d ioctl attempts\n", pathname, open_attempts, ioctl_attempts);
     }
     return fd;
-}
-
-typedef struct _cairo_linuxfb_device {
-    int fb_fd;
-    unsigned char *fb_data;
-    long fb_screensize;
-    struct fb_var_screeninfo fb_vinfo;
-    struct fb_fix_screeninfo fb_finfo;
-} cairo_linuxfb_device_t;
-
-/* Destroy a cairo surface */
-void cairo_linuxfb_surface_destroy(void *device) {
-    cairo_linuxfb_device_t *dev = (cairo_linuxfb_device_t *) device;
-
-    if (dev == NULL) {
-        return;
-    }
-
-    munmap(dev->fb_data, dev->fb_screensize);
-    close(dev->fb_fd);
-    free(dev);
-}
-
-/* Create a cairo surface using the specified framebuffer */
-cairo_surface_t *cairo_linuxfb_surface_create(const char *fbdev) {
-    cairo_linuxfb_device_t *device;
-    cairo_surface_t *surface;
-
-    const char *fb_name = fbdev;
-    fprintf(stderr, "using framebuffer %s\n", fbdev);
-
-    device = static_cast<cairo_linuxfb_device_t *>( malloc(sizeof(*device)));
-    if (!device) {
-        fprintf(stderr, "ERROR (screen) cannot allocate memory\n");
-        return NULL;
-    }
-
-    // Open the file for reading and writing
-    device->fb_fd = open(fb_name, O_RDWR);
-    if (device->fb_fd == -1) {
-        fprintf(stderr, "ERROR (screen) cannot open framebuffer device");
-        goto handle_allocate_error;
-    }
-
-    // Get variable screen information
-    if (ioctl(device->fb_fd, FBIOGET_VSCREENINFO, &device->fb_vinfo) == -1) {
-        fprintf(stderr, "ERROR (screen) reading variable information");
-        goto handle_ioctl_error;
-    }
-
-    // Figure out the size of the screen in bytes
-    device->fb_screensize = device->fb_vinfo.xres * device->fb_vinfo.yres
-                            * device->fb_vinfo.bits_per_pixel / 8;
-
-    // Map the device to memory
-    device->fb_data = (unsigned char *) mmap(0, device->fb_screensize,
-                                             PROT_READ | PROT_WRITE, MAP_SHARED,
-                                             device->fb_fd, 0);
-
-    if (device->fb_data == (unsigned char *) -1) {
-        fprintf(stderr, "ERROR (screen) failed to map framebuffer device to memory");
-        goto handle_ioctl_error;
-    }
-
-    // Get fixed screen information
-    if (ioctl(device->fb_fd, FBIOGET_FSCREENINFO, &device->fb_finfo) == -1) {
-        fprintf(stderr, "ERROR (screen) reading fixed information");
-        goto handle_ioctl_error;
-    }
-
-    /* Create the cairo surface which will be used to draw to */
-    surface = cairo_image_surface_create_for_data(
-        device->fb_data,
-        SCREEN_FB_FMT,
-        device->fb_vinfo.xres,
-        device->fb_vinfo.yres,
-        cairo_format_stride_for_width(
-            SCREEN_FB_FMT,
-            device->fb_vinfo.xres
-        )
-    );
-    cairo_surface_set_user_data(surface, NULL, device,
-                                &cairo_linuxfb_surface_destroy);
-
-    return surface;
-
-    handle_ioctl_error:
-    fprintf(stderr, "ERROR unable to open screen");
-    close(device->fb_fd);
-    handle_allocate_error:
-    free(device);
-    return NULL;
 }
 
 static char font_path[NUM_FONTS][32];
@@ -888,9 +887,14 @@ void setup_local_fonts(const char *resPath) {
         snprintf(filename, 256, "%s/%s", resPath, font_path[i]);
 
         status = FT_New_Face(value, filename, 0, &face[i]);
+        if (status != 0 && i == 0) {
+            // Modern Norns renamed 04B_03__.TTF to norns.ttf
+            snprintf(filename, 256, "%s/norns.ttf", resPath);
+            status = FT_New_Face(value, filename, 0, &face[i]);
+        }
         if (status != 0) {
-            fprintf(stderr, "ERROR (screen) font load: %s\n", filename);
-            return;
+            fprintf(stderr, "WARN (screen) font load failed: %s\n", filename);
+            ct[i] = nullptr;
         } else {
             ct[i] = cairo_ft_font_face_create_for_ft_face(face[i], 0);
         }

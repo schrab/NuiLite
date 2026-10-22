@@ -1,10 +1,8 @@
-#/bin/bash
+#!/bin/bash
 echo stopping norns
-mv ~/dust/data/system.state /tmp/ ; sed 's/norns.state.clean_shutdown = false/norns.state.clean_shutdown = true/' < /tmp/system.state > ~/dust/data/system.state
-sudo systemctl stop norns-maiden.service
-sudo systemctl stop norns-matron.service
-sudo systemctl stop norns-sclang.service
-sudo systemctl stop norns-crone.service
-sudo systemctl stop norns-jack.service
+if [ -f ~/dust/data/system.state ]; then
+    cp ~/dust/data/system.state /tmp/system.state && sed 's/norns.state.clean_shutdown = false/norns.state.clean_shutdown = true/' < /tmp/system.state > ~/dust/data/system.state
+fi
+sudo systemctl stop norns-main.service norns-matron.service norns-crone.service norns-sclang.service norns-maiden.service norns-jack.service
 sleep 1
 
