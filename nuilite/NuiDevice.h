@@ -21,7 +21,8 @@ class NuiDeviceImpl_;
 
 class NuiDevice {
 public:
-    NuiDevice(const char *resourcePath = nullptr, const char *driver = nullptr, int dcPin = -1, int resetPin = -1);
+    NuiDevice(const char *resourcePath = nullptr);
+    NuiDevice(const char *resourcePath, const char *driver, int dcPin = -1, int resetPin = -1);
     ~NuiDevice();
 
     void start();

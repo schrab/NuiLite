@@ -81,7 +81,8 @@ struct NuiEventMsg {
 // implementation class
 class NuiDeviceImpl_ {
 public:
-    NuiDeviceImpl_(const char *resPath, const char *driver = nullptr, int dcPin = -1, int resetPin = -1);
+    NuiDeviceImpl_(const char *resPath);
+    NuiDeviceImpl_(const char *resPath, const char *driver, int dcPin = -1, int resetPin = -1);
     ~NuiDeviceImpl_();
 
     void start();
@@ -150,6 +151,10 @@ private:
 };
 
 //NuiDevice proxy
+NuiDevice::NuiDevice(const char *resPath) {
+    impl_ = new NuiDeviceImpl_(resPath);
+}
+
 NuiDevice::NuiDevice(const char *resPath, const char *driver, int dcPin, int resetPin) {
     impl_ = new NuiDeviceImpl_(resPath, driver, dcPin, resetPin);
 }
@@ -349,6 +354,10 @@ void NuiDeviceImpl_::loadPrefsFromSidekickJson() {
 }
 
 //// start of IMPLEMENTATION
+
+NuiDeviceImpl_::NuiDeviceImpl_(const char *resPath)
+    : NuiDeviceImpl_(resPath, nullptr, -1, -1) {
+}
 
 NuiDeviceImpl_::NuiDeviceImpl_(const char *resPath, const char *driver, int dcPin, int resetPin)
     : resPath_(resPath == nullptr ? "" : resPath),
@@ -761,6 +770,16 @@ void NuiDeviceImpl_::deinitDisplay() {
     }
 }
 
+
+// Legacy framebuffer stubs for binary backward compatibility with precompiled MEC/externals
+cairo_surface_t *cairo_linuxfb_surface_create(const char *fbdev) {
+    (void)fbdev;
+    return nullptr;
+}
+
+void cairo_linuxfb_surface_destroy(void *device) {
+    (void)device;
+}
 
 ///////// helper functions
 

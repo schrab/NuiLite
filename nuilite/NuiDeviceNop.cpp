@@ -3,6 +3,10 @@
 
 namespace NuiLite {
 
+NuiDevice::NuiDevice(const char *) {
+    throw std::runtime_error("Unsupported platform");
+}
+
 NuiDevice::NuiDevice(const char *, const char *, int, int) {
     throw std::runtime_error("Unsupported platform");
 }
