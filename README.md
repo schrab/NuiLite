@@ -13,7 +13,7 @@ This fork updates NuiLite, Sidekick, and Orac to work with **modern Norns firmwa
 - **Direct Userspace SPI Driver**: Replaces obsolete `/dev/fb0` kernel framebuffer rendering with high-performance direct userspace SPI transfers via `/dev/spidev0.0` and `libgpiod`.
 - **Dual Display Architecture**:
   - **SSD1325**: 128x64 4-bit grayscale OLED for custom **Fates** shields (DC=GPIO17, RST=GPIO4).
-  - **SSD1322**: 256x64 4-bit grayscale OLED for standard **Norns shields** (DC=GPIO27, RST=GPIO22).
+  - **SSD1322**: 128x64 4-bit grayscale OLED for standard **Norns shields** (DC=GPIO27, RST=GPIO22).
 - **Exclusive Display Handover**: Sidekick cleanly releases the SPI device and GPIO lines upon launching a patch, preventing bus contention, scanlines, and vertical scrolling artifacts.
 - **Binary ABI Compatibility**: Exported legacy constructors and stubs allow precompiled MEC binaries (`libmec-api.so`, `mec-app`) and Pure Data externals to link and run without rebuilding Orac from scratch.
 - **Robust Audio Stack Handover**: Sequences ALSA soundcard access cleanly between Pure Data (exclusive direct ALSA) and Norns (JACK + SuperCollider).

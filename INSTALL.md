@@ -13,7 +13,7 @@ ERROR (screen) cannot open framebuffer device
 
 ### The Solution:
 - **Userspace SPI Drivers**: NuiLite now draws directly to `/dev/spidev0.0` using `libgpiod` to manage D/C and Reset GPIO lines.
-- **Dual Display Support**: Supports both **SSD1325** (Fates: 128x64 4-bit grayscale, DC=GPIO17, RST=GPIO4) and **SSD1322** (Stock Norns Shield: 256x64 4-bit grayscale).
+- **Dual Display Support**: Supports both **SSD1325** (Fates: 128x64 4-bit grayscale, DC=GPIO17, RST=GPIO4) and **SSD1322** (Stock Norns Shield: 128x64 4-bit grayscale, DC=GPIO27, RST=GPIO22).
 - **Exclusive Display Handover**: Sidekick cleanly releases `/dev/spidev0.0` and GPIO lines before launching patches, allowing Norns and MEC/Orac full, unhindered access without bus contention.
 - **Binary ABI Compatibility**: Exported legacy constructors and stubs ensure precompiled MEC binaries (`libmec-api.so`, `mec-app`) and Pure Data externals load without needing a recompile.
 
