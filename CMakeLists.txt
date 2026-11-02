@@ -29,6 +29,12 @@ endif ()
 
 set(CMAKE_CXX_STANDARD 11)
 
+# The precompiled MEC/Orac binaries use std::shared_ptr with the atomic lock policy
+# (use count at offset 4 of the control block). Raspbian's gcc is built for ARMv6 and
+# defaults to the mutex policy, which changes that layout and corrupts shared_ptr
+# objects passed across the library boundary (e.g. NuiDevice::addCallback).
+add_definitions(-D_GLIBCXX_HAVE_ATOMIC_LOCK_POLICY=1)
+
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -ffast-math -funroll-loops -fomit-frame-pointer")
 
 if (SALT) 

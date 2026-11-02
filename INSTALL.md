@@ -13,7 +13,7 @@ ERROR (screen) cannot open framebuffer device
 
 ### The Solution:
 - **Userspace SPI Drivers**: NuiLite now draws directly to `/dev/spidev0.0` using `libgpiod` to manage D/C and Reset GPIO lines.
-- **Dual Display Support**: Supports both **SSD1325** (Fates: 128x64 4-bit grayscale, DC=GPIO17, RST=GPIO4) and **SSD1322** (Stock Norns Shield: 128x64 4-bit grayscale, DC=GPIO27, RST=GPIO22).
+- **Dual Display Support**: Supports both **SSD1325** (Fates: 128x64 4-bit grayscale, DC=GPIO17, RST=GPIO4) and **SSD1322** (Stock Norns Shield: 128x64 4-bit grayscale, DC=GPIO5, RST=GPIO6).
 - **Exclusive Display Handover**: Sidekick cleanly releases `/dev/spidev0.0` and GPIO lines before launching patches, allowing Norns and MEC/Orac full, unhindered access without bus contention.
 - **Binary ABI Compatibility**: Exported legacy constructors and stubs ensure precompiled MEC binaries (`libmec-api.so`, `mec-app`) and Pure Data externals load without needing a recompile.
 
@@ -120,8 +120,8 @@ Ensure `/home/we/sidekick/sidekick.json` (and `/usr/local/sidekick/sidekick.json
 Change `screenDriver`, `screenDcPin`, and `screenResetPin`:
 ```json
   "screenDriver": "ssd1322",
-  "screenDcPin": 27,
-  "screenResetPin": 22,
+  "screenDcPin": 5,
+  "screenResetPin": 6,
 ```
 
 Sync to both locations:
@@ -167,9 +167,10 @@ sleep 1
 #!/bin/bash
 echo starting orac
 sudo systemctl stop norns-main.service norns-sclang.service norns-jack.service 2>/dev/null || true
-sudo systemctl start orac.service
-sleep 1
+# start MEC first so it is listening when Orac pushes its rack state
 sudo systemctl start mec.service
+sleep 2
+sudo systemctl start orac.service
 ```
 
 **`stop.sh`**:

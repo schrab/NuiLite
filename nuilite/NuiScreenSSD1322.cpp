@@ -156,7 +156,7 @@ bool NuiScreenSSD1322::init(int dcPin, int resetPin) {
     writeCommand(0xBB, 1, 0x1F); // Precharge voltage
     writeCommand(0xBE, 1, 0x04); // VCOMH voltage
     writeCommand(0xA6, 0);       // Normal display mode
-    writeCommand(0xA0, 2, 0x16, 0x11); // Dual COM line mode / remap
+    writeCommand(0xA0, 2, 0x04, 0x11); // Dual COM line mode / remap (0x04 = norns shield orientation, as in matron's ssd1322.c)
 
     shouldTurnOn_ = true;
     return true;

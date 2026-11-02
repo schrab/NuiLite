@@ -13,7 +13,7 @@ This fork updates NuiLite, Sidekick, and Orac to work with **modern Norns firmwa
 - **Direct Userspace SPI Driver**: Replaces obsolete `/dev/fb0` kernel framebuffer rendering with high-performance direct userspace SPI transfers via `/dev/spidev0.0` and `libgpiod`.
 - **Dual Display Architecture**:
   - **SSD1325**: 128x64 4-bit grayscale OLED for custom **Fates** shields (DC=GPIO17, RST=GPIO4).
-  - **SSD1322**: 128x64 4-bit grayscale OLED for standard **Norns shields** (DC=GPIO27, RST=GPIO22).
+  - **SSD1322**: 128x64 4-bit grayscale OLED for standard **Norns shields** (DC=GPIO5, RST=GPIO6).
 - **Exclusive Display Handover**: Sidekick cleanly releases the SPI device and GPIO lines upon launching a patch, preventing bus contention, scanlines, and vertical scrolling artifacts.
 - **Binary ABI Compatibility**: Exported legacy constructors and stubs allow precompiled MEC binaries (`libmec-api.so`, `mec-app`) and Pure Data externals to link and run without rebuilding Orac from scratch.
 - **Robust Audio Stack Handover**: Sequences ALSA soundcard access cleanly between Pure Data (exclusive direct ALSA) and Norns (JACK + SuperCollider).
@@ -112,8 +112,8 @@ Sidekick preferences can be set in `/home/we/sidekick/sidekick.json` (and mirror
 ### For Stock Norns Shield (SSD1322 OLED):
 ```json
   "screenDriver": "ssd1322",
-  "screenDcPin": 27,
-  "screenResetPin": 22,
+  "screenDcPin": 5,
+  "screenResetPin": 6,
 ```
 
 Sync changes:
@@ -159,9 +159,10 @@ To prevent audio hardware contention and SuperCollider startup failure:
   #!/bin/bash
   echo starting orac
   sudo systemctl stop norns-main.service norns-sclang.service norns-jack.service 2>/dev/null || true
-  sudo systemctl start orac.service
-  sleep 1
+  # start MEC first so it is listening when Orac pushes its rack state
   sudo systemctl start mec.service
+  sleep 2
+  sudo systemctl start orac.service
   ```
 
 - **`stop.sh`**:
