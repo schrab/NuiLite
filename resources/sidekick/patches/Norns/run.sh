@@ -1,8 +1,17 @@
-#/bin/bash
+#!/bin/bash
 echo starting norns
-sudo systemctl start norns-jack.service
-sudo systemctl start norns-crone.service
-sudo systemctl start norns-sclang.service
-sudo systemctl start norns-matron.service
-sudo systemctl start norns-maiden.service
+sudo systemctl stop norns.target 2>/dev/null
+sleep 1
+sudo systemctl restart norns-jack.service
+sleep 2
 
+if [ -f /etc/systemd/system/norns-main.service ] || [ -f /lib/systemd/system/norns-main.service ]; then
+    sudo systemctl reset-failed norns-main.service 2>/dev/null || true
+    sudo systemctl restart norns-main.service 2>/dev/null || true
+else
+    sudo systemctl reset-failed norns-matron.service norns-crone.service 2>/dev/null || true
+    sudo systemctl restart norns-crone.service 2>/dev/null || true
+    sudo systemctl restart norns-matron.service 2>/dev/null || true
+fi
+
+sudo systemctl start norns.target

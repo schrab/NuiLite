@@ -1,0 +1,18 @@
+{
+  "_description_": "Sidekick configuration for Fates Shield custom (SSD1325)",
+  "systemDir": "./system",
+  "patchDir": "./patches",
+  "screenDriver": "ssd1325",
+  "screenDcPin": 17,
+  "screenResetPin": 4,
+  "pollTime": 10,
+  "activeTime": 3000,
+  "loadOnStartup": false,
+  "menuOnStartup": false,
+  "stateFile": "./sidekick-state.json",
+  "pdOpts" : "-nogui -rt -audiobuf 4 -alsamidi -path /home/we/sidekick/pdexternals",
+  "scOpts" : "",
+  "scHome" : ".",
+  "listenPort" : 3001,
+  "sendPort" : 3000
+}

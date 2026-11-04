@@ -1,0 +1,21 @@
+[Unit]
+Description=Run MEC at boot
+DefaultDependencies=no
+Wants=network-online.target
+After=network-online.target
+Conflicts=shutdown.target
+Before=shutdown.target 
+
+[Service]
+Type=simple
+User=we
+Group=we
+Environment=HOME=/home/we
+Environment="LD_LIBRARY_PATH=/usr/local/MEC:/usr/local/sidekick:/usr/local/lib"
+KillMode=process
+Restart=always
+WorkingDirectory=/usr/local/MEC
+ExecStart=/usr/local/MEC/mec-app nui_kontrol.json 
+
+[Install]
+WantedBy=default.target

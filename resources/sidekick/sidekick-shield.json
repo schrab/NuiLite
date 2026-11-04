@@ -1,0 +1,19 @@
+{
+  "_description_": "Sidekick configuration for Stock Norns Shield (SSD1322)",
+  "systemDir": "./system",
+  "patchDir": "./patches",
+  "screenDriver": "ssd1322",
+  "screenDcPin": 5,
+  "screenResetPin": 6,
+  "screenRotate": 0,
+  "pollTime": 10,
+  "activeTime": 3000,
+  "loadOnStartup": false,
+  "menuOnStartup": false,
+  "stateFile": "./sidekick-state.json",
+  "pdOpts" : "-nogui -rt -audiobuf 4 -alsamidi -path /home/we/sidekick/pdexternals",
+  "scOpts" : "",
+  "scHome" : ".",
+  "listenPort" : 3001,
+  "sendPort" : 3000
+}
