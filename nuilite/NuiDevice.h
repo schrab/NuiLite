@@ -22,6 +22,7 @@ class NuiDeviceImpl_;
 class NuiDevice {
 public:
     NuiDevice(const char *resourcePath = nullptr);
+    NuiDevice(const char *resourcePath, const char *driver, int dcPin = -1, int resetPin = -1);
     ~NuiDevice();
 
     void start();
@@ -34,6 +35,9 @@ public:
 
     void displayClear();
     void displayPaint();
+    void initDisplay();
+    void deinitDisplay();
+    bool isDisplayInitialized() const;
 
     // new api
     void gClear(unsigned clr);
