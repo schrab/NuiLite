@@ -142,6 +142,7 @@
 #X text 19 352 process - dispatches button and encoder events optionally
 can call paint arg = 1 \, performs paint on each call arg = 0 (def)
 \, user should call paint;
+#X msg 180 300 \; NuiMsg clear \; NuiMsg displayText 15 0 0 SimplePd (ready) \; NuiMsg displayText 15 1 0 enc0 [0] \; NuiMsg displayText 15 2 0 enc1 [0] \; NuiMsg displayText 15 3 0 enc2 [0] \; NuiMsg displayText 15 4 0 enc3 [0] \; NuiMsg paint;
 #X connect 0 0 1 0;
 #X connect 2 0 3 0;
 #X connect 4 0 16 0;
@@ -195,3 +196,4 @@ can call paint arg = 1 \, performs paint on each call arg = 0 (def)
 #X connect 51 1 45 0;
 #X connect 55 0 54 0;
 #X connect 57 0 11 0;
+#X connect 34 0 59 0;

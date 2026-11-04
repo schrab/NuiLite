@@ -7,7 +7,7 @@
 
 typedef struct _NuiPd {
     t_object x_obj;
-    std::shared_ptr<NuiLite::NuiDevice> device_;
+    NuiLite::NuiDevice *device_;
 } t_NuiPd;
 
 

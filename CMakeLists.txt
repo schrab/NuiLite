@@ -28,6 +28,7 @@ endif ()
 
 
 set(CMAKE_CXX_STANDARD 11)
+add_definitions(-D_GLIBCXX_HAVE_ATOMIC_LOCK_POLICY=1)
 
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -ffast-math -funroll-loops -fomit-frame-pointer")
 

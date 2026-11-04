@@ -76,16 +76,18 @@ void NuiPdCallback::onEncoder(unsigned id, int value) {
 // puredata methods implementation - start
 
 void NuiPd_free(t_NuiPd *x) {
-    if (x->device_ != nullptr) x->device_->stop();
+    if (x != nullptr && x->device_ != nullptr) {
+        x->device_->stop();
+        delete x->device_;
+        x->device_ = nullptr;
+    }
     t_pd *nuiStop = gensym("nui_stop")->s_thing;
     if (nuiStop) pd_bang(nuiStop);
-
-    x->device_ = nullptr;
 }
 
 void *NuiPd_new(t_floatarg) {
     auto *x = (t_NuiPd *) pd_new(NuiPd_class);
-    x->device_ = std::make_shared<NuiLite::NuiDevice>();
+    x->device_ = new NuiLite::NuiDevice();
     auto cb = std::make_shared<NuiPdCallback>(x);
     x->device_->addCallback(cb);
     x->device_->start();

@@ -10,7 +10,7 @@ else (WIN32)
     set(IpSystemTypePath ip/posix)
 endif (WIN32)
 
-add_library(oscpack SHARED
+add_library(oscpack STATIC
 
         ip/IpEndpointName.h
         ip/IpEndpointName.cpp
@@ -39,9 +39,7 @@ add_library(oscpack SHARED
 
         )
 
-#target_include_directories(oscpack PUBLIC osc)
-#target_include_directories(oscpack PUBLIC ip)
-#target_include_directories(oscpack PUBLIC zeroconf)
+set_target_properties(oscpack PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(oscpack PUBLIC .)
 
 target_link_libraries(oscpack ${OSCPACKLIBS})
