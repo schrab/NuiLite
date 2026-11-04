@@ -23,6 +23,9 @@ void SKOscCallback::ProcessMessage(const osc::ReceivedMessage &m,
     try {
         osc::ReceivedMessageArgumentStream args = m.ArgumentStream();
         std::string addr = m.AddressPattern();
+        if (addr.rfind("/nui/", 0) == 0 && !app_.device().isDisplayInitialized()) {
+            app_.device().initDisplay();
+        }
         if (addr == "/sk/activate") {
             app_.stopPatch();
         } else if (addr == "/sk/deviceInfo") {

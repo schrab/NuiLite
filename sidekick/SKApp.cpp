@@ -113,6 +113,8 @@ void SKApp::init(SKPrefs &prefs) {
                 activateItem();
             }
         }
+    } else {
+        device_.deinitDisplay();
     }
 }
 
@@ -139,33 +141,34 @@ void SKApp::stop() {
 
 void SKApp::run() {
     while (keepRunning_) {
-        device_.process(false);
+        device_.process(sidekickActive_);
         OscMsg msg;
 
-        while (listenPort_>0 && readMessageQueue_.try_dequeue(msg)) {
-            oscProcessor_->ProcessPacket(msg.buffer_, msg.size_, msg.origin_);
+        while (listenPort_ > 0 && readMessageQueue_.try_dequeue(msg)) {
+            try {
+                oscProcessor_->ProcessPacket(msg.buffer_, msg.size_, msg.origin_);
+            } catch (const std::exception &e) {
+                std::cerr << "SKApp: OSC parse error: " << e.what() << std::endl;
+            } catch (...) {
+                std::cerr << "SKApp: unknown OSC parse error" << std::endl;
+            }
         }
 
         if (activeCount_ > 0) {
-            activeCount_--;
+            activeCount_ -= (int) POLL_MS_;
             if (activeCount_ <= 0) {
                 activeCount_ = -1;
-                sidekickActive_ = true;
-                if (sidekickActive_) {
-                    std::cerr << "Sidekick activated,stop processes" << std::endl;
-                    stopPatch();
-                }
+                std::cerr << "Sidekick activated, stop processes" << std::endl;
+                stopPatch();
             }
         }
         usleep(POLL_MS_ * 1000);
-        if(sidekickActive_) device_.displayPaint();
     } // while
     stop();
 }
 
 void SKApp::stopPatch() {
     sendSKOscEvent("stopPatch");
-    sleep(1);
 
     if (lastActiveDir_.length() > 0) {
         std::string stopfile = lastActiveDir_ + "/stop.sh";
@@ -199,6 +202,15 @@ void SKApp::stopPatch() {
         execShell("./stop_all.sh");
     }
 
+    if (checkFileExists("./patches/Norns/stop.sh")) {
+        execShell("./patches/Norns/stop.sh");
+    }
+
+    // Wait for patch processes (norns, mec, pd) to exit and release SPI/GPIO
+    usleep(500 * 1000);
+
+    // Re-initialize display for Sidekick and paint menu
+    device_.initDisplay();
     displayMenu();
     device_.displayPaint();
     sidekickActive_ = true;
@@ -241,10 +253,20 @@ void SKApp::runDir(const std::string &, const std::shared_ptr<MenuItem> &item) {
 }
 
 std::string SKApp::getFile(const std::string& topDir,const std::string& dir, const std::string& file) {
-    std::string foundfile;
-    if (checkFileExists(dir + "/" + file)) return  dir + "/"  + file;
-    if (checkFileExists(topDir + "/" + file)) return topDir + "/" +file;
-    if (checkFileExists("./" + file)) return  "./" + file;
+    if (checkFileExists(dir + "/" + file)) return dir + "/" + file;
+
+    // Walk upwards from dir to topDir
+    std::string cur = dir;
+    while (!cur.empty() && cur != topDir && cur != ".") {
+        size_t lastSlash = cur.find_last_of('/');
+        if (lastSlash == std::string::npos) break;
+        cur = cur.substr(0, lastSlash);
+        if (cur.empty()) break;
+        if (checkFileExists(cur + "/" + file)) return cur + "/" + file;
+    }
+
+    if (checkFileExists(topDir + "/" + file)) return topDir + "/" + file;
+    if (checkFileExists("./" + file)) return "./" + file;
     return "";
 }
 
@@ -264,14 +286,14 @@ void SKApp::runPd(const std::string &, const std::shared_ptr<MenuItem> &item) {
         topDir = topSystemDir_;
     }
 
-    std::string optsFile= getFile(dir,dir+"/"+name, "pd-opts.txt");
+    std::string optsFile = getFile(topDir, dir + "/" + name, "pd-opts.txt");
     if (optsFile.length() > 0) {
         pdOpts = pdOpts + " " + getCmdOptions(optsFile);
         std::cout << "using cmd options file : " << optsFile << " options : " << pdOpts << std::endl;
     }
-    std::string startFile= getFile(dir,dir+"/"+name, "start_pd.sh");
+    std::string startFile = getFile(topDir, dir + "/" + name, "start_pd.sh");
     if (startFile.length() > 0) {
-        std::cout << "using start file : "<< startFile << std::endl;
+        std::cout << "using start file : " << startFile << std::endl;
         execShell("\"" + startFile + "\"");
     }
 
@@ -293,15 +315,15 @@ void SKApp::runSc(const std::string &, const std::shared_ptr<MenuItem> &item) {
         topDir = topSystemDir_;
     }
 
-    std::string optsFile= getFile(dir,dir+"/"+name, "sc-opts.txt");
+    std::string optsFile = getFile(topDir, dir + "/" + name, "sc-opts.txt");
     if (optsFile.length() > 0) {
         scOpts = scOpts + " " + getCmdOptions(optsFile);
         std::cout << "using cmd options file : " << optsFile << " options : " << scOpts << std::endl;
     }
 
-    std::string startFile= getFile(dir,dir+"/"+name, "start_sc.sh");
+    std::string startFile = getFile(topDir, dir + "/" + name, "start_sc.sh");
     if (startFile.length() > 0) {
-        std::cout << "using start file : "<< startFile << std::endl;
+        std::cout << "using start file : " << startFile << std::endl;
         execShell("\"" + startFile + "\"");
     }
     std::string shcmd = "cd \"" + dir + "/" + name + "\"; HOME=" + scHome_ + " sclang " + scOpts + " main.scd &  ";
@@ -436,13 +458,6 @@ void SKApp::displayMenu() {
 void SKApp::activateItem() {
     try {
         auto item = mainMenu_.at(selIdx_);
-        device_.displayClear();
-        device_.displayText(15, 0, 0, "Launch...");
-        device_.displayText(15, 1, 0, item->name_);
-        std::cerr << "launch : " << item->name_ << std::endl;
-
-        device_.displayPaint();
-        sidekickActive_ = false;
         std::string dir = patchDir_;
         std::string topDir = topPatchDir_;
         if (item->system_) {
@@ -450,38 +465,51 @@ void SKApp::activateItem() {
             topDir = topSystemDir_;
         }
 
-        sendSKOscEvent("activateItem", dir + "/" + item->name_);
-
-        lastActiveDir_ = dir + "/" + item->name_;
-        lastActiveType_ = item->type_;
-
         switch (item->type_) {
-            case MenuItem::System: {
-                runScript(dir, item, "run.sh");
-                break;
-            }
+            case MenuItem::System:
             case MenuItem::PdPatch:
             case MenuItem::ScPatch:
             case MenuItem::ShellPatch: {
+                device_.displayClear();
+                device_.displayText(15, 0, 0, "Launch...");
+                device_.displayText(15, 1, 0, item->name_);
+                std::cerr << "launch : " << item->name_ << std::endl;
+                device_.displayPaint();
+                usleep(300 * 1000); // 300ms pause so the user sees "Launch..."
+
+                sidekickActive_ = false;
+                std::string optsFile = getFile(topDir, dir + "/" + item->name_, "pd-opts.txt");
+                bool isOrganelle = (optsFile.find("mother.pd") != std::string::npos);
+                if (item->type_ != MenuItem::ScPatch && !isOrganelle) {
+                    device_.deinitDisplay(); // Release SPI and GPIO lines so patch has exclusive access
+                }
+
+                sendSKOscEvent("activateItem", dir + "/" + item->name_);
+
+                lastActiveDir_ = dir + "/" + item->name_;
+                lastActiveType_ = item->type_;
 
                 if (loadOnStartup_ && stateFile_.length()) {
                     saveState(item);
                 }
 
-                std::string prePatch= getFile(dir,dir+"/"+item->name_, "pre-patch.sh");
-                if (prePatch.length() > 0) execShell("\"" + prePatch + "\"");
-
-                if (item->type_ == MenuItem::PdPatch) {
-                    runPd(dir, item);
-                } else if (item->type_ == MenuItem::ScPatch) {
-                    runSc(dir, item);
-                } else {
+                if (item->type_ == MenuItem::System) {
                     runScript(dir, item, "run.sh");
+                } else {
+                    std::string prePatch = getFile(dir, dir + "/" + item->name_, "pre-patch.sh");
+                    if (prePatch.length() > 0) execShell("\"" + prePatch + "\"");
+
+                    if (item->type_ == MenuItem::PdPatch) {
+                        runPd(dir, item);
+                    } else if (item->type_ == MenuItem::ScPatch) {
+                        runSc(dir, item);
+                    } else {
+                        runScript(dir, item, "run.sh");
+                    }
+
+                    std::string postPatch = getFile(dir, dir + "/" + item->name_, "post-patch.sh");
+                    if (postPatch.length() > 0) execShell("\"" + postPatch + "\"");
                 }
-
-                std::string postPatch= getFile(dir,dir+"/"+item->name_, "post-patch.sh");
-                if (postPatch.length() > 0) execShell("\"" + postPatch + "\"");
-
                 break;
             }
             case MenuItem::InstallFile : {
