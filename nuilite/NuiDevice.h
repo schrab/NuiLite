@@ -66,7 +66,7 @@ public:
     void clearText(unsigned clr, unsigned line);
     void invertText(unsigned line);
 private:
-    NuiDeviceImpl_ *impl_;
+    NuiDeviceImpl_ *impl_ = nullptr;
 };
 
 

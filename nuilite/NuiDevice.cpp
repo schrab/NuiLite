@@ -133,12 +133,12 @@ private:
 
     std::string resPath_;
     std::thread gpioThread_;
-    bool keepRunning_;
+    bool keepRunning_ = false;
 
     static constexpr unsigned MAX_EVENTS = 64;
     static constexpr unsigned MAX_ENCODERS = 4;
-    int keyFd_;
-    int encFd_[MAX_ENCODERS];
+    int keyFd_ = -1;
+    int encFd_[MAX_ENCODERS] = {-1, -1, -1, -1};
     unsigned numEncoders_ = 4;
 
     std::unique_ptr<NuiScreen> screenDriver_;
@@ -147,8 +147,8 @@ private:
     int resetPin_ = -1;
     int rotation_ = 0;
 
-    cairo_surface_t *surface_;
-    cairo_t *cr_;
+    cairo_surface_t *surface_ = nullptr;
+    cairo_t *cr_ = nullptr;
     std::vector<std::shared_ptr<NuiCallback>> callbacks_;
     moodycamel::ReaderWriterQueue<NuiEventMsg> eventQueue_;
     bool dirty_ = true;
@@ -390,9 +390,19 @@ NuiDeviceImpl_::NuiDeviceImpl_(const char *resPath)
 
 NuiDeviceImpl_::NuiDeviceImpl_(const char *resPath, const char *driver, int dcPin, int resetPin)
     : resPath_(resPath == nullptr ? "" : resPath),
+      keepRunning_(false),
+      keyFd_(-1),
+      numEncoders_(4),
       dcPin_(dcPin),
       resetPin_(resetPin),
-      eventQueue_(MAX_EVENTS) {
+      rotation_(0),
+      surface_(nullptr),
+      cr_(nullptr),
+      eventQueue_(MAX_EVENTS),
+      dirty_(true) {
+    for (unsigned i = 0; i < MAX_ENCODERS; i++) {
+        encFd_[i] = -1;
+    }
     if (driver && strlen(driver) > 0) {
         driverName_ = driver;
     }
