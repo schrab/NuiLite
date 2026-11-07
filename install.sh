@@ -179,11 +179,14 @@ fi
 
 # 10. Set permissions
 chown -R we:we /home/we/sidekick 2>/dev/null || true
+if id -u we >/dev/null 2>&1; then
+    chown -R we:we "$SCRIPT_DIR" 2>/dev/null || true
+fi
 
 # 11. Enable and restart service
-echo "Reloading systemd and starting sidekick.service..."
+echo "Reloading systemd and enabling sidekick.target and sidekick.service..."
 systemctl daemon-reload
-systemctl enable sidekick.service
+systemctl enable sidekick.target sidekick.service
 systemctl restart sidekick.service
 
 echo ""

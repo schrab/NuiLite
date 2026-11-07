@@ -86,6 +86,7 @@ public:
     ~NuiDeviceImpl_();
 
     void start();
+    void start(bool withDisplay);
     void stop();
     unsigned process(bool);
     void addCallback(std::shared_ptr<NuiCallback>);
@@ -170,7 +171,11 @@ NuiDevice::~NuiDevice() {
 }
 
 void NuiDevice::start() {
-    impl_->start();
+    impl_->start(true);
+}
+
+void NuiDevice::start(bool withDisplay) {
+    impl_->start(withDisplay);
 }
 
 void NuiDevice::stop() {
@@ -423,8 +428,15 @@ void NuiDeviceImpl_::addCallback(std::shared_ptr<NuiCallback> cb) {
 }
 
 void NuiDeviceImpl_::start() {
+    start(true);
+}
+
+void NuiDeviceImpl_::start(bool withDisplay) {
     keepRunning_ = true;
     initGPIO();
+    if (withDisplay) {
+        initDisplay();
+    }
 }
 
 void NuiDeviceImpl_::stop() {

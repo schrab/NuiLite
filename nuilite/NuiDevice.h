@@ -26,6 +26,7 @@ public:
     ~NuiDevice();
 
     void start();
+    void start(bool withDisplay);
     void stop();
     unsigned process(bool paint = true);
     void addCallback(std::shared_ptr<NuiCallback>);

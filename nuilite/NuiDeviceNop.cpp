@@ -17,6 +17,9 @@ NuiDevice::~NuiDevice() {
 void NuiDevice::start() {
 }
 
+void NuiDevice::start(bool) {
+}
+
 void NuiDevice::stop() {
 }
 
@@ -40,6 +43,16 @@ void NuiDevice::displayClear() {
 }
 
 void NuiDevice::displayPaint() {
+}
+
+void NuiDevice::initDisplay() {
+}
+
+void NuiDevice::deinitDisplay() {
+}
+
+bool NuiDevice::isDisplayInitialized() const {
+    return false;
 }
 
 

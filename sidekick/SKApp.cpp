@@ -63,7 +63,7 @@ void SKApp::init(SKPrefs &prefs) {
 
     cb->init();
     device_.addCallback(cb);
-    device_.start();
+    device_.start(false); // start GPIO button listener only; do NOT claim display on startup
 
     startOscServer();
     sendSKOscEvent("start");
@@ -203,6 +203,10 @@ void SKApp::stopPatch() {
     if (checkFileExists("./patches/Norns/stop.sh")) {
         execShell("./patches/Norns/stop.sh");
     }
+
+    // Always stop MEC and Pure Data processes to ensure GPIO and SPI are cleanly released
+    execShell("sudo systemctl stop mec.service orac.service 2>/dev/null || true");
+    execShell("killall -9 mec-app pd 2>/dev/null || true");
 
     // Wait for patch processes (norns, mec, pd) to exit and release SPI/GPIO
     usleep(500 * 1000);
