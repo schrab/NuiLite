@@ -113,8 +113,6 @@ void SKApp::init(SKPrefs &prefs) {
                 activateItem();
             }
         }
-    } else {
-        device_.deinitDisplay();
     }
 }
 

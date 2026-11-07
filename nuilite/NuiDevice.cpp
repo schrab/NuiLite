@@ -425,7 +425,6 @@ void NuiDeviceImpl_::addCallback(std::shared_ptr<NuiCallback> cb) {
 void NuiDeviceImpl_::start() {
     keepRunning_ = true;
     initGPIO();
-    initDisplay();
 }
 
 void NuiDeviceImpl_::stop() {

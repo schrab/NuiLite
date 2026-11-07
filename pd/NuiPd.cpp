@@ -91,6 +91,7 @@ void *NuiPd_new(t_floatarg) {
     auto cb = std::make_shared<NuiPdCallback>(x);
     x->device_->addCallback(cb);
     x->device_->start();
+    x->device_->initDisplay();
 
     t_pd *nuiStart = gensym("nui_start")->s_thing;
     if (nuiStart) pd_bang(nuiStart);

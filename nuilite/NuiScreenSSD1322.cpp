@@ -229,17 +229,12 @@ void NuiScreenSSD1322::update(cairo_surface_t *surface) {
         gpiod_line_set_value(gpioDc_, 1);
     }
 
-    // Chunk transfer into 4096-byte blocks to stay within default Linux spidev.bufsiz
-    const uint32_t chunk_size = 4096;
-    const uint32_t n_transfers = SPIDEV_BUFFER_LEN / chunk_size;
-    for (uint32_t i = 0; i < n_transfers; i++) {
-        struct spi_ioc_transfer transfer = {0};
-        transfer.tx_buf = reinterpret_cast<unsigned long>(spidevBuffer_ + (i * chunk_size));
-        transfer.len = chunk_size;
-        if (ioctl(spidevFd_, SPI_IOC_MESSAGE(1), &transfer) < 0) {
-            fprintf(stderr, "NuiScreenSSD1322: SPI data transfer %u of %u failed\n", i + 1, n_transfers);
-            break;
-        }
+    struct spi_ioc_transfer transfer = {0};
+    transfer.tx_buf = reinterpret_cast<unsigned long>(spidevBuffer_);
+    transfer.len = SPIDEV_BUFFER_LEN;
+
+    if (ioctl(spidevFd_, SPI_IOC_MESSAGE(1), &transfer) < 0) {
+        fprintf(stderr, "NuiScreenSSD1322: SPI data transfer failed\n");
     }
 }
 
