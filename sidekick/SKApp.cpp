@@ -45,7 +45,7 @@ void SKApp::init(SKPrefs &prefs) {
     systemDir_ = prefs.getString("SystemDir", "./system");
     ACTIVE_TIME_ = (unsigned) prefs.getInt("activeTime", 5000);
     POLL_MS_ = (unsigned) prefs.getInt("pollTime", 1);
-    loadOnStartup_ = prefs.getBool("loadOnStartup", true);
+    loadOnStartup_ = prefs.getBool("loadOnStartup", false);
     stateFile_ = prefs.getString("stateFile", "./sidekick-state.json");
     pdOpts_ = prefs.getString("pdOpts", "-nogui -rt -audiobuf 4 -alsamidi");
     scOpts_ = prefs.getString("scOpts", "");

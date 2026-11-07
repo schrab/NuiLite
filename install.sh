@@ -151,6 +151,7 @@ fi
 
 # 7. Deploy configuration (sidekick.json)
 echo "Configuring sidekick.json ($DRIVER_DESC)..."
+rm -f /home/we/sidekick/sidekick-state.json 2>/dev/null || true
 cp -f "$CONFIG_SRC" /home/we/sidekick/sidekick.json
 cp -f "$CONFIG_SRC" /usr/local/sidekick/sidekick.json
 
